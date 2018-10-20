@@ -5,6 +5,9 @@
 *.so
 *.dylib
 
+# Binary when compiling with go build
+go-dns
+
 # Test binary, build with `go test -c`
 *.test
 
