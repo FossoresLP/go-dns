@@ -1,0 +1,15 @@
+[com]
+	exclusive = true
+	[com.entries]
+		[com.entries.example]
+			A = ["10.0.0.2"]
+			MX = ["test.dev 20"]
+
+[n]
+	exclusive = true
+	[n.entries]
+		[n.entries.ns]
+			NS = ["ns.n"]
+			A = ["10.0.0.1", "10.0.0.2"]
+			AAAA = ["fd00:10ca:1fff:0000:0000:0000:0000:0001", "fd00:10ca:1fff:0000:0000:0000:0000:0002"]
+
