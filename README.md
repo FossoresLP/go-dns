@@ -8,6 +8,6 @@ Known issues:
 -------------
 - Does not perform recursive resolution itself but instead relies on Cloudflares 1.1.1.1
 - Parsing issues for some messages (i.e. Microsoft.com and other Microsoft websites - these are being worked on)
-- Does not support normal hosts files
-- Hosts file format is somewhat awkward as of right now (This will be fixed by switching away from TOML)
+- Does not support normal zone files
+- Zones file format is somewhat awkward as of right now (This will be fixed by switching away from TOML)
 
