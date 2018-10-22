@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-var re *regexp.Regexp = regexp.MustCompile(`^[a-z][a-z0-9]*$`)
+var re *regexp.Regexp = regexp.MustCompile(`^[a-z][a-z0-9]+$`)
 
 // Label is a type used to store a DNS label
 type Label []string
@@ -29,9 +29,9 @@ func GetLabelsFromMessage(data []byte, start int) (Label, int, error) {
 	labels := make([]string, 0)
 	m := 0
 	for {
-		if len(w) < 1 {
+		/*if len(w) < 1 { // Check not necessary as a slice defined using s[0:] can never be shorter than 1
 			return nil, 0, errors.New("label section too short")
-		}
+		}*/
 		l := w[0]
 		if l == 0 {
 			m++
@@ -71,9 +71,6 @@ func (l Label) Encode() []byte {
 // Parse turns a string into a label or returns an error if that's not possible
 func Parse(i string) (Label, error) {
 	s := strings.Split(i, ".")
-	if len(s) < 1 {
-		return nil, errors.New("label cannot be empty")
-	}
 	if s[len(s)-1] == "" {
 		s = s[:len(s)-1]
 	}
