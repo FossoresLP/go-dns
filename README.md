@@ -10,5 +10,5 @@ Known issues:
 - Parsing issues for some messages (i.e. Microsoft.com and other Microsoft websites - these are being worked on)
 - Does not support normal zone files
 - Zones file format is somewhat awkward as of right now (This will be fixed by switching away from TOML)
-- There are no tests (I will add some when I find time but feel free to open a PR if you want something specific tested)
+- Not fully tested (See [#1](https://github.com/fossoreslp/go-dns/issues/1))
 
