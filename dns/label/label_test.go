@@ -42,6 +42,8 @@ func TestGetLabelsFromMessage(t *testing.T) {
 		{"Label length too short for redirect", args{[]byte{0xC0}, 0}, nil, 0, true},
 		{"Label length > 63", args{[]byte{0x40}, 0}, nil, 0, true},
 		{"Label length exceeds message length", args{[]byte{0x20}, 0}, nil, 0, true},
+		{"Label not properly terminated", args{[]byte{0x07, 0x65, 0x78, 0x61, 0x6D, 0x70, 0x6C, 0x65, 0x03, 0x63, 0x6F, 0x6D}, 0}, nil, 0, true},
+		{"Section lenght too long", args{[]byte{0x07, 0x65, 0x78, 0x61, 0x6D, 0x70, 0x6C, 0x65, 0x03, 0x63, 0x6F}, 0}, nil, 0, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

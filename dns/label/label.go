@@ -29,9 +29,9 @@ func GetLabelsFromMessage(data []byte, start int) (Label, int, error) {
 	labels := make([]string, 0)
 	m := 0
 	for {
-		/*if len(w) < 1 { // Check not necessary as a slice defined using s[0:] can never be shorter than 1
+		if len(w) < 1 {
 			return nil, 0, errors.New("label section too short")
-		}*/
+		}
 		l := w[0]
 		if l == 0 {
 			m++
