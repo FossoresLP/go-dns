@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strconv"
 
 	"github.com/fossoreslp/go-dns/dns/label"
 	"github.com/fossoreslp/go-dns/dns/record-names"
@@ -23,21 +24,29 @@ type Response struct {
 }
 
 func (r Response) String() string {
-	return fmt.Sprintf("Record for %q, Type: %d, Class: %d, TTL: %d, Data length: %d, Data: %X", r.Name, r.Type, r.Class, r.TTL, r.DataLength, r.Data)
+	t, tf := names.IntToType(uint16(r.Type))
+	if !tf {
+		t = strconv.Itoa(int(r.Type))
+	}
+	c, cf := names.IntToClass(uint16(r.Class))
+	if !cf {
+		c = strconv.Itoa(int(r.Class))
+	}
+	return fmt.Sprintf("Record for %q, Type: %s, Class: %s, TTL: %d, Data length: %d, Data: %X", r.Name, t, c, r.TTL, r.DataLength, r.Data)
 }
 
 // Parse parses all records of a DNS message
-func Parse(message []byte, start int, answers uint16, ns uint16, additional uint16) (Answers, NS, Additional []Response, err error) {
-	Answers, start, err = parseSection(message, start, answers)
+func Parse(message []byte, start int, answers uint16, ns uint16, additional uint16) ([]Response, []Response, []Response, error) {
+	Answers, start, err := parseSection(message, start, answers)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	NS, start, err = parseSection(message, start, ns)
+	NS, start, err := parseSection(message, start, ns)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	Additional, _, err = parseSection(message, start, additional)
-	return
+	Additional, _, err := parseSection(message, start, additional)
+	return Answers, NS, Additional, err
 }
 
 func parseSection(message []byte, start int, elements uint16) (out []Response, end int, err error) {
@@ -48,7 +57,7 @@ func parseSection(message []byte, start int, elements uint16) (out []Response, e
 			return nil, 0, err
 		}
 		if len(message) < e+10 {
-			return nil, 0, errors.New("message to short for RR information")
+			return nil, 0, errors.New("message too short to hold RR information after label")
 		}
 		t := binary.BigEndian.Uint16(message[e : e+2])
 		c := binary.BigEndian.Uint16(message[e+2 : e+4])
@@ -70,7 +79,7 @@ func parseSection(message []byte, start int, elements uint16) (out []Response, e
 	return
 }
 
-func getRecordType(t names.TYPE) record.Record {
+func getRecordType(t names.TYPE) record.Record { // nolint: gocyclo
 	switch t {
 	case names.A:
 		return new(record.A)
@@ -99,7 +108,7 @@ func getRecordType(t names.TYPE) record.Record {
 
 // New returns a new answer for the supplied contents
 func New(name label.Label, t names.TYPE, ttl uint32, data []byte) Response {
-	if len(data) > math.MaxUint16 {
+	if len(data) > math.MaxUint16 { // This condition should never occur and due to it's size of 4MiB of data is almost impossible to test. Therefore I'll just leave panic in here as such a huge amount of data would indicate some serious problem upstream.
 		panic("data exceeds max record size")
 	}
 	return Response{name, t, names.IN, ttl, uint16(len(data)), data, nil}
