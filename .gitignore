@@ -13,3 +13,6 @@ go-dns
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
+
+# Ignore VS Code settings as these are not universally applicable right now
+.vscode
