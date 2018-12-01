@@ -5,57 +5,48 @@ import (
 
 	"github.com/fossoreslp/go-dns/dns/label"
 	"github.com/fossoreslp/go-dns/dns/record-names"
-	"github.com/fossoreslp/go-dns/dns/record-types"
 	"github.com/fossoreslp/go-dns/dns/response"
 )
 
-type recordTransfer struct {
-	Record []recordStorage
-	Type   names.TYPE
-	Domain string
+type tCacheTransfer struct {
+	lbl     label.Label
+	t       names.TYPE
+	records []RecordWrapper
+	remove  bool
 }
 
-type recordStorage struct {
-	Record    record.Record
-	TTL       uint32
-	StoreTime int64
-}
+var cStore chan tCacheTransfer
 
-var cRequest chan recordTransfer
-var cResolved chan recordTransfer
+var vStore *Node
 
 func init() {
-	cRequest = make(chan recordTransfer)
-	cResolved = make(chan recordTransfer)
+	cStore = make(chan tCacheTransfer)
+	vStore = NewNode(NewStore())
 	go routine()
 }
 
 // Routine is the go routine used to cache records
 func routine() {
-	dataStore := make(map[names.TYPE]map[string][]recordStorage)
 	for {
-		req := <-cRequest
-		if req.Record == nil {
-			if t, ok := dataStore[req.Type]; ok {
-				if r, ok := t[req.Domain]; ok {
-					cResolved <- recordTransfer{r, req.Type, req.Domain}
-					continue
-				}
-			}
-			cResolved <- req
-			continue
-		}
-		if _, ok := dataStore[req.Type]; ok {
-			if _, ok := dataStore[req.Type][req.Domain]; ok {
-				dataStore[req.Type][req.Domain] = append(dataStore[req.Type][req.Domain], req.Record...)
+		t := <-cStore
+		var node = vStore
+		for i := len(t.lbl) - 1; i >= 0; i-- {
+			if n := node.GetChild(t.lbl[i]); n != nil {
+				node = n
 				continue
 			}
-			dataStore[req.Type][req.Domain] = req.Record
-			continue
+			n := NewNode(NewStore())
+			err := node.AddChild(t.lbl[i], n) // No need to handle error as we just checked if the node already exists
+			if err != nil {
+				panic("Cache changed during synchronous operation.")
+			}
+			node = n
 		}
-		d := make(map[string][]recordStorage)
-		d[req.Domain] = req.Record
-		dataStore[req.Type] = d
+		if t.remove {
+			node.Content.(*Store).RemoveElement(t.t)
+		} else {
+			node.Content.(*Store).AddElement(t.t, t.records)
+		}
 	}
 }
 
@@ -69,22 +60,53 @@ func GetRecords(lbl label.Label, t names.QTYPE) (out []response.Response) {
 	case names.MAILA: // Should return MB, MG, MR and MINFO
 		return nil // These record types are not used and their implementation is therefore low priority
 	}
-	cRequest <- recordTransfer{nil, names.TYPE(t), lbl.String()}
-	res := <-cResolved
-	for _, r := range res.Record {
-		remaining := int64(r.TTL) - (time.Now().Unix() - r.StoreTime)
+
+	node := vStore
+	for i := len(lbl) - 1; i >= 0; i-- {
+		n := node.GetChild(lbl[i])
+		if n == nil {
+			return nil
+		}
+		node = n
+	}
+
+	records := node.Content.(*Store).GetElement(names.TYPE(t)) // No need to handle errors when checking for zero values
+
+	if records == nil {
+		return nil
+	}
+
+	for _, r := range records {
+		remaining := int64(r.TTL) - (time.Now().Unix() - r.StoredAt)
 		if remaining < 1 {
-			continue
+			cStore <- tCacheTransfer{r.Label, r.Record.Type(), nil, true}
+			return nil
 		}
 		d := r.Record.Encode()
-		out = append(out, response.Response{Name: lbl, Type: res.Type, Class: names.IN, TTL: uint32(remaining), DataLength: uint16(len(d)), Data: d, Record: r.Record})
+		out = append(out, response.Response{Name: lbl, Type: r.Record.Type(), Class: names.IN, TTL: uint32(remaining), DataLength: uint16(len(d)), Data: d, Record: r.Record})
 	}
 	return
 }
 
-// Store takes a slice of DNS responses and adds them to the cache
-func Store(res []response.Response) {
+// Cache takes a slice of DNS responses and adds them to the cache
+func Cache(res []response.Response) {
+	labels := make(map[string]map[names.TYPE][]RecordWrapper)
 	for _, r := range res {
-		cRequest <- recordTransfer{[]recordStorage{recordStorage{r.Record, r.TTL, time.Now().Unix()}}, r.Type, r.Name.String()}
+		lbl := r.Name.String()
+		types, labelExists := labels[lbl]
+		if !labelExists {
+			labels[lbl] = make(map[names.TYPE][]RecordWrapper)
+		}
+		t, typeExists := types[r.Type]
+		if !typeExists {
+			labels[lbl][r.Type] = []RecordWrapper{RecordWrapper{r.Name, r.Record, r.TTL, time.Now().Unix()}}
+			continue
+		}
+		labels[lbl][r.Type] = append(t, RecordWrapper{r.Name, r.Record, r.TTL, time.Now().Unix()})
+	}
+	for _, l := range labels {
+		for typ, t := range l {
+			cStore <- tCacheTransfer{t[0].Label, typ, t, false}
+		}
 	}
 }
