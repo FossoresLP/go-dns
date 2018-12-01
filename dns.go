@@ -66,7 +66,7 @@ func main() {
 					out = dnserr.Message(req.Header.ID, q).Encode()
 					break
 				}
-				cache.Store(resp)
+				cache.Cache(resp)
 				responses = append(responses, resp...)
 			}
 			if out == nil {
